@@ -3,7 +3,7 @@ import json
 import logging
 import aiofiles
 
-from .handlers import dispatch_message
+from .handlers import dispatch_message, read_messages
 
 LOGGER = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ LOGGER = logging.getLogger(__name__)
 def save_message(message):
     f = yield from aiofiles.open('messages', mode='a+')
     try:
-        yield from f.write(str(message) + "\n")
+        yield from f.write(json.dumps(message) + "\n")
     finally:
         yield from f.close()
         print("Saved:", str(message))
@@ -48,7 +48,8 @@ def handle_message(reader, writer):
     # LOGGER.debug('Recevied message from %s', address)
     try:
         message = json.loads(data.decode('utf-8'))
-        yield from save_message(message)
+        if message['command'] == "send":
+            yield from save_message(message)
         # LOGGER.debug('Saved message: %s', str(message))
     except ValueError as e:
         LOGGER.exception('Invalid message received')
@@ -60,7 +61,8 @@ def handle_message(reader, writer):
         writer.write(payload)
         yield from writer.drain()
         writer.write_eof()
-        yield from delete_message(message)
+        if message['command'] == "read":
+            yield from delete_message(message)
     except ValueError as e:
         LOGGER.exception('Cannot process the message. %s')
         send_error(writer, str(e))
@@ -69,6 +71,7 @@ def handle_message(reader, writer):
 
 
 def run_server(hostname='localhost', port=14141, loop=None):
+    read_messages('messages')
     if loop is None:
         loop = asyncio.get_event_loop()
     coro = asyncio.start_server(handle_message, hostname, port, loop=loop)

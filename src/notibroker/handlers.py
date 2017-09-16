@@ -1,6 +1,8 @@
 import asyncio
 import collections
 import logging
+import os.path
+import json
 
 LOGGER = logging.getLogger(__name__)
 _MESSAGE_QUEUE = asyncio.Queue(loop=asyncio.get_event_loop())
@@ -11,6 +13,16 @@ MESSAGE_TYPES = collections.namedtuple(
 COMMANDS = collections.namedtuple(
     'Commands', ('send', 'read')
 )(*('send', 'read'))
+
+
+def read_messages(file):
+    if os.path.isfile(file):
+        for line in open(file, "r"):
+            jline = json.loads(line)
+            _MESSAGE_QUEUE.put_nowait(jline['payload'])
+        print(_MESSAGE_QUEUE.qsize())
+    else:
+        print("Backup file does not exist.")
 
 
 @asyncio.coroutine
