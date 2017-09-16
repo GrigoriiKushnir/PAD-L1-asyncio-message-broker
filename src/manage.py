@@ -2,7 +2,6 @@
 import logging.config
 from notibroker.broker import run_server
 
-
 logging.config.dictConfig({
     'version': 1,
     'disable_existing_loggers': False,

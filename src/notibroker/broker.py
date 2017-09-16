@@ -1,10 +1,34 @@
 import asyncio
 import json
 import logging
+import aiofiles
 
 from .handlers import dispatch_message
 
 LOGGER = logging.getLogger(__name__)
+
+
+@asyncio.coroutine
+def save_message(message):
+    f = yield from aiofiles.open('messages', mode='a+')
+    try:
+        yield from f.write(str(message) + "\n")
+    finally:
+        yield from f.close()
+        print("Saved:", str(message))
+
+
+@asyncio.coroutine
+def delete_message(message):
+    f = yield from aiofiles.open('messages', mode='w+')
+    try:
+        lines = yield from f.readlines()
+        lines = lines[:-1]
+        yield from f.writelines(lines)
+    finally:
+        yield from f.close()
+        print("Sent:", str(message))
+
 
 @asyncio.coroutine
 def send_error(writer, reason):
@@ -21,27 +45,28 @@ def send_error(writer, reason):
 def handle_message(reader, writer):
     data = yield from reader.read()
     address = writer.get_extra_info('peername')
-
-    LOGGER.debug('Recevied message from %s', address)
-
+    # LOGGER.debug('Recevied message from %s', address)
     try:
         message = json.loads(data.decode('utf-8'))
+        yield from save_message(message)
+        # LOGGER.debug('Saved message: %s', str(message))
     except ValueError as e:
         LOGGER.exception('Invalid message received')
         send_error(writer, str(e))
         return
-
     try:
         response = yield from dispatch_message(message)
         payload = json.dumps(response).encode('utf-8')
         writer.write(payload)
         yield from writer.drain()
         writer.write_eof()
+        yield from delete_message(message)
     except ValueError as e:
         LOGGER.exception('Cannot process the message. %s')
         send_error(writer, str(e))
 
     writer.close()
+
 
 def run_server(hostname='localhost', port=14141, loop=None):
     if loop is None:

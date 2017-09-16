@@ -3,6 +3,7 @@ import asyncio
 import json
 import uuid
 
+
 @asyncio.coroutine
 def send_message(message, loop):
     reader, writer = yield from asyncio.open_connection(
@@ -17,7 +18,6 @@ def send_message(message, loop):
     writer.write(payload)
     writer.write_eof()
     yield from writer.drain()
-
     response = yield from reader.read(2048)
     writer.close()
     return response
