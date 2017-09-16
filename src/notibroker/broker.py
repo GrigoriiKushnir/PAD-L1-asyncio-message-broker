@@ -20,14 +20,18 @@ def save_message(message):
 
 @asyncio.coroutine
 def delete_message(message):
-    f = yield from aiofiles.open('messages', mode='w+')
+    f = yield from aiofiles.open('messages', mode='r+')
     try:
         lines = yield from f.readlines()
         lines = lines[:-1]
+    finally:
+        yield from f.close()
+    f = yield from aiofiles.open('messages', mode='w')
+    try:
         yield from f.writelines(lines)
     finally:
         yield from f.close()
-        print("Sent:", str(message))
+        #print("Sent:", str(message)
 
 
 @asyncio.coroutine
@@ -62,6 +66,7 @@ def handle_message(reader, writer):
         yield from writer.drain()
         writer.write_eof()
         if message['command'] == "read":
+            print(payload)
             yield from delete_message(message)
     except ValueError as e:
         LOGGER.exception('Cannot process the message. %s')
