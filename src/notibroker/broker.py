@@ -2,8 +2,9 @@ import asyncio
 import json
 import logging
 import aiofiles
+import os
 
-from .handlers import dispatch_message  # , read_messages
+from .handlers import dispatch_message, read_messages
 
 LOGGER = logging.getLogger(__name__)
 
@@ -11,9 +12,9 @@ LOGGER = logging.getLogger(__name__)
 @asyncio.coroutine
 def save_message(message):
     if message.get('queue'):
-        file = message.get('queue')
+        file = message.get('queue') + ".smq"
     else:
-        file = 'default'
+        file = 'default.smq'
     f = yield from aiofiles.open(file, mode='a+')
     try:
         yield from f.write(json.dumps(message) + "\n")
@@ -25,7 +26,7 @@ def save_message(message):
 @asyncio.coroutine
 def delete_message(message):
     if message.get('queue'):
-        file = message.get('queue')
+        file = message.get('queue') + ".smq"
     else:
         file = 'default'
     f = yield from aiofiles.open(file, mode='r+')
@@ -86,7 +87,11 @@ def handle_message(reader, writer):
 
 
 def run_server(hostname='localhost', port=14141, loop=None):
-    # read_messages('messages')
+    files = []
+    for file in os.listdir(os.getcwd()):
+        if file.endswith(".smq"):
+            files.append(file)
+    read_messages(files)
     if loop is None:
         loop = asyncio.get_event_loop()
     coro = asyncio.start_server(handle_message, hostname, port, loop=loop)

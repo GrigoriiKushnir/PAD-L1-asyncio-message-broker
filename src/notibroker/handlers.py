@@ -15,15 +15,13 @@ COMMANDS = collections.namedtuple(
 )(*('send', 'read'))
 
 
-# def read_messages(file):
-#     if os.path.isfile(file):
-#         for line in open(file, "r"):
-#             jline = json.loads(line)
-#             _MESSAGE_QUEUE.put_nowait(jline['payload'])
-#         print(_MESSAGE_QUEUE.qsize())
-#     else:
-#         print("Backup file does not exist.")
-
+def read_messages(files):
+    for file in files:
+        queue = file.split(".")[-2]
+        QUEUES[queue] = asyncio.Queue(loop=asyncio.get_event_loop())
+        for line in open(file, "r"):
+            jline = json.loads(line)
+            QUEUES[queue].put_nowait(jline['payload'])
 
 @asyncio.coroutine
 def handle_command(command, payload, queue):
