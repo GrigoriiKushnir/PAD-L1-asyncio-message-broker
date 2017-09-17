@@ -3,35 +3,43 @@ import json
 import logging
 import aiofiles
 
-from .handlers import dispatch_message, read_messages
+from .handlers import dispatch_message  # , read_messages
 
 LOGGER = logging.getLogger(__name__)
 
 
 @asyncio.coroutine
 def save_message(message):
-    f = yield from aiofiles.open('messages', mode='a+')
+    if message.get('queue'):
+        file = message.get('queue')
+    else:
+        file = 'default'
+    f = yield from aiofiles.open(file, mode='a+')
     try:
         yield from f.write(json.dumps(message) + "\n")
     finally:
         yield from f.close()
-        print("Saved:", str(message))
+        # print("Saved:", str(message))
 
 
 @asyncio.coroutine
 def delete_message(message):
-    f = yield from aiofiles.open('messages', mode='r+')
+    if message.get('queue'):
+        file = message.get('queue')
+    else:
+        file = 'default'
+    f = yield from aiofiles.open(file, mode='r+')
     try:
         lines = yield from f.readlines()
         lines = lines[:-1]
     finally:
         yield from f.close()
-    f = yield from aiofiles.open('messages', mode='w')
+    f = yield from aiofiles.open(file, mode='w')
     try:
         yield from f.writelines(lines)
     finally:
         yield from f.close()
-        #print("Sent:", str(message)
+        # print("Sent:", str(message)
 
 
 @asyncio.coroutine
@@ -54,7 +62,7 @@ def handle_message(reader, writer):
         message = json.loads(data.decode('utf-8'))
         if message['command'] == "send":
             yield from save_message(message)
-        # LOGGER.debug('Saved message: %s', str(message))
+            # LOGGER.debug('Saved message: %s', str(message))
     except ValueError as e:
         LOGGER.exception('Invalid message received')
         send_error(writer, str(e))
@@ -66,8 +74,10 @@ def handle_message(reader, writer):
         yield from writer.drain()
         writer.write_eof()
         if message['command'] == "read":
-            print(payload)
-            yield from delete_message(message)
+            try:
+                yield from delete_message(message)
+            except Exception as ex:
+                LOGGER.debug('Wrong queue name from %s', address)
     except ValueError as e:
         LOGGER.exception('Cannot process the message. %s')
         send_error(writer, str(e))
@@ -76,7 +86,7 @@ def handle_message(reader, writer):
 
 
 def run_server(hostname='localhost', port=14141, loop=None):
-    read_messages('messages')
+    # read_messages('messages')
     if loop is None:
         loop = asyncio.get_event_loop()
     coro = asyncio.start_server(handle_message, hostname, port, loop=loop)
