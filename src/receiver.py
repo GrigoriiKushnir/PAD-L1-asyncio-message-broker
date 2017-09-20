@@ -2,6 +2,7 @@
 import asyncio
 import json
 
+
 @asyncio.coroutine
 def get_message(loop, queue):
     reader, writer = yield from asyncio.open_connection(

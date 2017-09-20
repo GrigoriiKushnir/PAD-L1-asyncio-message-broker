@@ -3,6 +3,7 @@ import asyncio
 import json
 import uuid
 
+
 @asyncio.coroutine
 def send_message(message, loop, queue):
     reader, writer = yield from asyncio.open_connection(
@@ -25,6 +26,7 @@ def send_message(message, loop, queue):
 
 @asyncio.coroutine
 def run_sender(loop):
+    print("Queues ending with _p will be persistent.")
     queue = input("Choose a queue: ")
     while queue == '':
         queue = input("Choose a queue: ")

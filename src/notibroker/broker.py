@@ -28,7 +28,7 @@ def delete_message(message):
     if message.get('queue'):
         file = message.get('queue') + ".smq"
     else:
-        file = 'default'
+        file = 'default' + ".smq"
     f = yield from aiofiles.open(file, mode='r+')
     try:
         lines = yield from f.readlines()
@@ -61,9 +61,12 @@ def handle_message(reader, writer):
     # LOGGER.debug('Recevied message from %s', address)
     try:
         message = json.loads(data.decode('utf-8'))
-        if message['command'] == "send":
+        if message.get('queue'):
+            if message['command'] == "send" and message['queue'].endswith("_p"):
+                yield from save_message(message)
+                # LOGGER.debug('Saved message: %s', str(message))
+        if message['command'] == "send" and not message.get('queue'):
             yield from save_message(message)
-            # LOGGER.debug('Saved message: %s', str(message))
     except ValueError as e:
         LOGGER.exception('Invalid message received')
         send_error(writer, str(e))
@@ -74,10 +77,16 @@ def handle_message(reader, writer):
         writer.write(payload)
         yield from writer.drain()
         writer.write_eof()
-        if message['command'] == "read":
+        if message['command'] == "read" and message.get('queue'):
+            if message['queue'].endswith("_p"):
+                try:
+                    yield from delete_message(message)
+                except Exception:
+                    LOGGER.debug('Wrong queue name from %s', address)
+        if message['command'] == "read" and not message.get('queue'):
             try:
                 yield from delete_message(message)
-            except Exception as ex:
+            except Exception:
                 LOGGER.debug('Wrong queue name from %s', address)
     except ValueError as e:
         LOGGER.exception('Cannot process the message. %s')

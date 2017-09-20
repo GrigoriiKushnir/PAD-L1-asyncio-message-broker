@@ -6,6 +6,7 @@ import json
 
 LOGGER = logging.getLogger(__name__)
 QUEUES = {'default': asyncio.Queue(loop=asyncio.get_event_loop())}
+Q_PERS = {'default': 1}
 
 MESSAGE_TYPES = collections.namedtuple(
     'MessageTypes', ('command', 'error', 'response')
@@ -23,18 +24,21 @@ def read_messages(files):
             jline = json.loads(line)
             QUEUES[queue].put_nowait(jline['payload'])
 
+
 @asyncio.coroutine
 def handle_command(command, payload, queue):
     # LOGGER.debug('Handling command %s, payload %s', command, payload)
+    persistence = 1 if queue.endswith("_p") else 0
     if command not in COMMANDS:
         LOGGER.error('Got invalid command %s', command)
         raise ValueError('Invalid command. Should be one of %s' % (COMMANDS,))
     if command == COMMANDS.send:
         if queue not in QUEUES:
             QUEUES[queue] = asyncio.Queue(loop=asyncio.get_event_loop())
+            Q_PERS[queue] = persistence
         yield from QUEUES[queue].put(payload)
         msg = 'OK'
-        print(QUEUES)
+        # print(QUEUES)
     elif command == COMMANDS.read:
         if queue not in QUEUES:
             return {
@@ -42,6 +46,9 @@ def handle_command(command, payload, queue):
                 'payload': "No such queue!"
             }
         msg = yield from QUEUES[queue].get()
+        if Q_PERS[queue] == 0 and QUEUES[queue].empty():
+            del QUEUES[queue]
+            del Q_PERS[queue]
     return {
         'type': MESSAGE_TYPES.response,
         'payload': msg
