@@ -6,7 +6,6 @@ import json
 
 LOGGER = logging.getLogger(__name__)
 QUEUES = {'default': asyncio.Queue(loop=asyncio.get_event_loop())}
-Q_PERS = {'default': 1}
 
 MESSAGE_TYPES = collections.namedtuple(
     'MessageTypes', ('command', 'error', 'response')
@@ -35,7 +34,6 @@ def handle_command(command, payload, queue):
     if command == COMMANDS.send:
         if queue not in QUEUES:
             QUEUES[queue] = asyncio.Queue(loop=asyncio.get_event_loop())
-            Q_PERS[queue] = persistence
         yield from QUEUES[queue].put(payload)
         msg = 'OK'
         # print(QUEUES)
@@ -46,9 +44,8 @@ def handle_command(command, payload, queue):
                 'payload': "No such queue!"
             }
         msg = yield from QUEUES[queue].get()
-        if Q_PERS[queue] == 0 and QUEUES[queue].empty():
+        if QUEUES[queue].empty():
             del QUEUES[queue]
-            del Q_PERS[queue]
     return {
         'type': MESSAGE_TYPES.response,
         'payload': msg
