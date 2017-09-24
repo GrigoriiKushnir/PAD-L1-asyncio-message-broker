@@ -32,7 +32,7 @@ def delete_message(message):
     f = yield from aiofiles.open(file, mode='r+')
     try:
         lines = yield from f.readlines()
-        lines = lines[:-1]
+        lines = lines[1:]
     finally:
         yield from f.close()
     f = yield from aiofiles.open(file, mode='w')

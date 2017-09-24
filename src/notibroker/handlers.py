@@ -27,7 +27,6 @@ def read_messages(files):
 @asyncio.coroutine
 def handle_command(command, payload, queue):
     # LOGGER.debug('Handling command %s, payload %s', command, payload)
-    persistence = 1 if queue.endswith("_p") else 0
     if command not in COMMANDS:
         LOGGER.error('Got invalid command %s', command)
         raise ValueError('Invalid command. Should be one of %s' % (COMMANDS,))
