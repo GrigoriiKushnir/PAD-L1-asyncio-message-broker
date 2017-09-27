@@ -25,7 +25,7 @@ def read_messages(files):
 
 
 @asyncio.coroutine
-def handle_command(command, payload, queue):
+def handle_command(command, payload, queue, port):
     # LOGGER.debug('Handling command %s, payload %s', command, payload)
     if command not in COMMANDS:
         LOGGER.error('Got invalid command %s', command)
@@ -55,13 +55,11 @@ def handle_command(command, payload, queue):
 def dispatch_message(message):
     message_type = message.get('type')
     command = message.get('command')
-    if message.get('queue'):
-        queue = message.get('queue')
-    else:
-        queue = 'default'
+    queue = message.get('queue')
+    port = message.get('port')
     if message_type != MESSAGE_TYPES.command:
         LOGGER.error('Got invalid message type %s', message_type)
         raise ValueError('Invalid message type. Should be %s' % (MESSAGE_TYPES.command,))
     # LOGGER.debug('Dispatching command %s', command)
-    response = yield from handle_command(command, message.get('payload'), queue)
+    response = yield from handle_command(command, message.get('payload'), queue, port)
     return response

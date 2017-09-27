@@ -1,44 +1,43 @@
 #!/usr/bin/env python3
-import asyncio
 import json
-
-
-@asyncio.coroutine
-def get_message(loop, queue):
-    reader, writer = yield from asyncio.open_connection(
-        '127.0.0.1', 14141, loop=loop
-    )
-    writer.write(json.dumps({
-        'type': 'command',
-        'command': 'read',
-        'queue': queue
-    }).encode('utf-8'))
-    writer.write_eof()
-    yield from writer.drain()
-    response = yield from reader.read()
-    writer.close()
-    return response
-
-
-@asyncio.coroutine
-def run_receiver(loop):
-    queue = input("Choose a queue: ")
-    while True:
-        try:
-            response = yield from get_message(loop, queue)
-            print('Received %s', response)
-            yield from asyncio.sleep(1)
-            if json.loads(response.decode('utf-8'))['payload'] == 'No such queue!':
-                print("No such queue!")
-                queue = input("Choose a queue: ")
-        except KeyboardInterrupt:
-            break
+import socket
+import random
 
 
 def main():
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(run_receiver(loop))
+    # queue = input("Choose a queue: ")
+    queue = "q1_p"
+    port = random.randint(1024, 65535)
+    print(port)
+    searching = 1
 
+    while searching:
+        try:
+            serversocket = socket.socket()
+            serversocket.bind(('', port))
+            serversocket.listen(1)
+            searching = 0
+        except Exception:
+            print("Could not listen, searching another port.")
+
+    sock = socket.socket()
+    message = json.dumps({
+        'type': 'command',
+        'command': 'subscribe',
+        'queue': queue,
+        'port': port
+    }).encode('utf-8')
+    sock.connect(('localhost', 14141))
+    sock.send(message)
+    sock.close()
+
+    while True:
+        client, addr = serversocket.accept()
+        while True:
+            data = client.recv(1024)
+            if not data:
+                break
+            print(data.decode('utf8'))
 
 if __name__ == '__main__':
     main()
