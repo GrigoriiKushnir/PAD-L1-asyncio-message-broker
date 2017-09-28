@@ -6,19 +6,21 @@ import json
 
 LOGGER = logging.getLogger(__name__)
 QUEUES = {'default': asyncio.Queue(loop=asyncio.get_event_loop())}
+QUEUES_PORTS = {'default': []}
 
 MESSAGE_TYPES = collections.namedtuple(
     'MessageTypes', ('command', 'error', 'response')
 )(*('command', 'error', 'response'))
 COMMANDS = collections.namedtuple(
-    'Commands', ('send', 'read')
-)(*('send', 'read'))
+    'Commands', ('send', 'subscribe')
+)(*('send', 'subscribe'))
 
 
 def read_messages(files):
     for file in files:
         queue = file.split(".")[-2]
         QUEUES[queue] = asyncio.Queue(loop=asyncio.get_event_loop())
+        QUEUES_PORTS[queue] = []
         for line in open(file, "r"):
             jline = json.loads(line)
             QUEUES[queue].put_nowait(jline['payload'])
@@ -33,18 +35,18 @@ def handle_command(command, payload, queue, port):
     if command == COMMANDS.send:
         if queue not in QUEUES:
             QUEUES[queue] = asyncio.Queue(loop=asyncio.get_event_loop())
+            QUEUES_PORTS[queue] = []
         yield from QUEUES[queue].put(payload)
         msg = 'OK'
-        # print(QUEUES)
-    elif command == COMMANDS.read:
+    elif command == COMMANDS.subscribe:
         if queue not in QUEUES:
             return {
                 'type': MESSAGE_TYPES.error,
                 'payload': "No such queue!"
             }
-        msg = yield from QUEUES[queue].get()
-        if QUEUES[queue].empty():
-            del QUEUES[queue]
+        msg = 'OK'
+        QUEUES_PORTS[queue].append(port)
+        print(QUEUES_PORTS)
     return {
         'type': MESSAGE_TYPES.response,
         'payload': msg
