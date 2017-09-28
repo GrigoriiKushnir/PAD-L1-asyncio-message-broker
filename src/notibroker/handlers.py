@@ -27,6 +27,26 @@ def read_messages(files):
 
 
 @asyncio.coroutine
+def send_to_subscribers(payload, queue):
+    ports = QUEUES_PORTS[queue].copy()
+    while ports:
+        for port in QUEUES_PORTS[queue]:
+            try:
+                reader, writer = yield from asyncio.open_connection(
+                    '127.0.0.1', port, loop=asyncio.get_event_loop()
+                )
+                writer.write(payload.encode('utf-8'))
+                writer.write_eof()
+                yield from writer.drain()
+                writer.close()
+                # reader.close()
+            except Exception as ex:
+                print("Could not connect: ", ex)
+                break
+            ports.remove(port)
+
+
+@asyncio.coroutine
 def handle_command(command, payload, queue, port):
     # LOGGER.debug('Handling command %s, payload %s', command, payload)
     if command not in COMMANDS:
@@ -37,6 +57,8 @@ def handle_command(command, payload, queue, port):
             QUEUES[queue] = asyncio.Queue(loop=asyncio.get_event_loop())
             QUEUES_PORTS[queue] = []
         yield from QUEUES[queue].put(payload)
+        yield from send_to_subscribers(payload, queue)
+        print(QUEUES_PORTS)
         msg = 'OK'
     elif command == COMMANDS.subscribe:
         if queue not in QUEUES:

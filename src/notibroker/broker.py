@@ -90,31 +90,31 @@ def handle_message(reader, writer):
     writer.close()
 
 
-@asyncio.coroutine
-def respond(reader, writer):
-    data = yield from reader.read()
-    message = json.loads(data.decode('utf-8'))
-    port = message['port']
-    print(message)
-    while True:
-        try:
-            reader1, writer1 = yield from asyncio.open_connection(
-                '127.0.0.1', port, loop=asyncio.get_event_loop()
-            )
-            payload = json.dumps({
-                'type': 'command',
-                'command': 'send',
-                'payload': "himan"
-            }).encode('utf-8')
-
-            writer1.write(payload)
-            writer1.write_eof()
-            yield from writer.drain()
-            writer1.close()
-            yield from asyncio.sleep(1)
-        except Exception as ex:
-            print("Could not connect: ", ex)
-            break
+# @asyncio.coroutine
+# def respond(reader, writer):
+#     data = yield from reader.read()
+#     message = json.loads(data.decode('utf-8'))
+#     port = message['port']
+#     print(message)
+#     while True:
+#         try:
+#             reader1, writer1 = yield from asyncio.open_connection(
+#                 '127.0.0.1', port, loop=asyncio.get_event_loop()
+#             )
+#             payload = json.dumps({
+#                 'type': 'command',
+#                 'command': 'send',
+#                 'payload': "himan"
+#             }).encode('utf-8')
+#
+#             writer1.write(payload)
+#             writer1.write_eof()
+#             yield from writer.drain()
+#             writer1.close()
+#             yield from asyncio.sleep(1)
+#         except Exception as ex:
+#             print("Could not connect: ", ex)
+#             break
 
 
 def run_server(hostname='localhost', port=14141, loop=None):

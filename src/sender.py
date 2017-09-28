@@ -27,9 +27,10 @@ def send_message(message, loop, queue):
 @asyncio.coroutine
 def run_sender(loop):
     print("Queues ending with _p will be persistent.")
-    queue = input("Choose a queue: ")
-    while queue == '':
-        queue = input("Choose a queue: ")
+    queue = "q1_p"
+    # queue = input("Choose a queue: ")
+    # while queue == '':
+    #     queue = input("Choose a queue: ")
     while True:
         try:
             message = 'Just sending a random UUID %s' % (uuid.uuid4().hex,)
