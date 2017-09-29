@@ -36,7 +36,7 @@ def run_sender(loop):
             message = 'Just sending a random UUID %s' % (uuid.uuid4().hex,)
             print('Sending %s' % (message,))
             response = yield from send_message(message, loop, queue)
-            print('Received %s', response)
+            print('Received %s' % (response.decode('utf-8'),))
             yield from asyncio.sleep(1)
         except KeyboardInterrupt:
             break

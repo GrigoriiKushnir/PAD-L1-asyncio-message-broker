@@ -2,10 +2,11 @@ import asyncio
 import collections
 import logging
 import json
+from collections import defaultdict
 
 LOGGER = logging.getLogger(__name__)
-QUEUES = {'default': asyncio.Queue(loop=asyncio.get_event_loop())}
-QUEUES_WRITERS = {'default': []}
+QUEUES = defaultdict(lambda: {'obj': asyncio.Queue(loop=asyncio.get_event_loop()), 'subs': []})
+QUEUES['default']
 
 MESSAGE_TYPES = collections.namedtuple(
     'MessageTypes', ('command', 'error', 'response')
@@ -18,16 +19,14 @@ COMMANDS = collections.namedtuple(
 def read_messages(files):
     for file in files:
         queue = file.split(".")[-2]
-        QUEUES[queue] = asyncio.Queue(loop=asyncio.get_event_loop())
-        QUEUES_WRITERS[queue] = []
         for line in open(file, "r"):
             jline = json.loads(line)
-            QUEUES[queue].put_nowait(jline['payload'])
+            QUEUES[queue]['obj'].put_nowait(jline['payload'])
 
 
 @asyncio.coroutine
 def send_to_subscribers(payload, queue):
-    for writer in QUEUES_WRITERS[queue]:
+    for writer in QUEUES[queue]['subs']:
         writer.write(payload.encode('utf-8'))
 
 
@@ -39,10 +38,7 @@ def handle_command(command, queue, payload, writer):
         raise ValueError('Invalid command. Should be one of %s' % (COMMANDS,))
 
     if command == COMMANDS.send:
-        if queue not in QUEUES:
-            QUEUES[queue] = asyncio.Queue(loop=asyncio.get_event_loop())
-            QUEUES_WRITERS[queue] = []
-        yield from QUEUES[queue].put(payload)
+        yield from QUEUES[queue]['obj'].put(payload)
         yield from send_to_subscribers(payload, queue)
         msg = 'OK'
 
@@ -52,7 +48,7 @@ def handle_command(command, queue, payload, writer):
                 'type': MESSAGE_TYPES.error,
                 'payload': "No such queue!"
             }
-        QUEUES_WRITERS[queue].append(writer)
+        QUEUES[queue]['subs'].append(writer)
         msg = 'OK'
 
     return {
