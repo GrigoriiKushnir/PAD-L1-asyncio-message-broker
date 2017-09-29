@@ -26,17 +26,13 @@ def read_messages(files):
 
 
 @asyncio.coroutine
-def send_to_subscribers(message, queue):
+def send_to_subscribers(payload, queue):
     for writer in QUEUES_WRITERS[queue]:
-        data = json.dumps(message)
-        writer.write(data.encode('utf-8'))
+        writer.write(payload.encode('utf-8'))
 
 
 @asyncio.coroutine
-def handle_command(message, writer):
-    command = message.get('command')
-    queue = message.get('queue')
-    payload = message.get('payload')
+def handle_command(command, queue, payload, writer):
     # LOGGER.debug('Handling command %s, payload %s', command, payload)
     if command not in COMMANDS:
         LOGGER.error('Got invalid command %s', command)
@@ -47,7 +43,7 @@ def handle_command(message, writer):
             QUEUES[queue] = asyncio.Queue(loop=asyncio.get_event_loop())
             QUEUES_WRITERS[queue] = []
         yield from QUEUES[queue].put(payload)
-        yield from send_to_subscribers(message, queue)
+        yield from send_to_subscribers(payload, queue)
         msg = 'OK'
 
     elif command == COMMANDS.subscribe:
@@ -68,9 +64,12 @@ def handle_command(message, writer):
 @asyncio.coroutine
 def dispatch_message(message, writer):
     message_type = message.get('type')
+    command = message.get('command')
+    queue = message.get('queue')
+    payload = message.get('payload')
     if message_type != MESSAGE_TYPES.command:
         LOGGER.error('Got invalid message type %s', message_type)
         raise ValueError('Invalid message type. Should be %s' % (MESSAGE_TYPES.command,))
     # LOGGER.debug('Dispatching command %s', command)
-    response = yield from handle_command(message, writer)
+    response = yield from handle_command(command, queue, payload, writer)
     return response
