@@ -97,7 +97,8 @@ def handle_command(message, writer):
 
     if command == COMMANDS.send:
         yield from QUEUES[queue]['obj'].put(payload)
-        yield from save_message(queue, message)
+        if persistent:
+            yield from save_message(queue, message)
         yield from send_to_subscribers(payload, queue)
         msg = 'OK'
 
