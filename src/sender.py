@@ -33,11 +33,11 @@ def run_sender(loop):
     #     queue = input("Choose a queue: ")
     while True:
         try:
-            message = 'Just sending a random UUID %s' % (uuid.uuid4().hex,)
+            message = 'HI THERE %s' % (uuid.uuid4().hex,)
             print('Sending %s' % (message,))
             response = yield from send_message(message, loop, queue)
             print('Received %s' % (response.decode('utf-8'),))
-            yield from asyncio.sleep(1)
+            yield from asyncio.sleep(0.5)
         except KeyboardInterrupt:
             break
 

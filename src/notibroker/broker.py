@@ -1,46 +1,11 @@
 import asyncio
 import json
 import logging
-import aiofiles
 import os
 
 from .handlers import dispatch_message, read_messages
 
 LOGGER = logging.getLogger(__name__)
-
-
-@asyncio.coroutine
-def save_message(message):
-    if message.get('queue'):
-        file = message.get('queue') + ".smq"
-    else:
-        file = 'default.smq'
-    f = yield from aiofiles.open(file, mode='a+')
-    try:
-        yield from f.write(json.dumps(message) + "\n")
-    finally:
-        yield from f.close()
-        # print("Saved:", str(message))
-
-
-@asyncio.coroutine
-def delete_message(message):
-    if message.get('queue'):
-        file = message.get('queue') + ".smq"
-    else:
-        file = 'default' + ".smq"
-    f = yield from aiofiles.open(file, mode='r+')
-    try:
-        lines = yield from f.readlines()
-        lines = lines[1:]
-    finally:
-        yield from f.close()
-    f = yield from aiofiles.open(file, mode='w')
-    try:
-        yield from f.writelines(lines)
-    finally:
-        yield from f.close()
-        # print("Sent:", str(message)
 
 
 @asyncio.coroutine
@@ -59,23 +24,12 @@ def handle_message(reader, writer):
     data = yield from reader.read()
     # address = writer.get_extra_info('peername')
     # LOGGER.debug('Recevied message from %s', address)
-
     try:
         message = json.loads(data.decode('utf-8'))
-        if message['command'] == "send" and message['queue'].endswith("_p"):
-            yield from save_message(message)
-            # LOGGER.debug('Saved message: %s', str(message))
-    except ValueError as e:
-        LOGGER.exception('Invalid message received')
-        send_error(writer, str(e))
-        return
-
-    try:
         response = yield from dispatch_message(message, writer)
         payload = json.dumps(response).encode('utf-8')
         writer.write(payload)
-        yield from writer.drain()
-    except ValueError as e:
+    except Exception as e:
         LOGGER.exception('Cannot process the message. %s')
         send_error(writer, str(e))
 
