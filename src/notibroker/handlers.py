@@ -61,26 +61,31 @@ def send_all(writer, queue):
             writer.write(message.encode('utf-8'))
             yield from delete_message(queue)
             yield from writer.drain()
-            yield from asyncio.sleep(0.1)
+            yield from asyncio.sleep(0.5)
         except Exception as e:
-            print("1 Can't send to subscriber, removing: ", e)
             if writer in QUEUES[queue]['subs']:
+                print("1 Can't send to subscriber, removing it from subs: ", e)
                 QUEUES[queue]['subs'].remove(writer)
-                writer.close()
-            break
+            print("1 Closing writer: ", e)
+            writer.close()
+            return
+    QUEUES[queue]['subs'].append(writer)
 
 
 @asyncio.coroutine
 def send_to_subscribers(payload, queue):
+    print(QUEUES[queue]['subs'])
     for writer in QUEUES[queue]['subs']:
         try:
+            yield from QUEUES[queue]['obj'].get()
             writer.write(payload.encode('utf-8'))
             yield from writer.drain()
         except Exception as e:
-            print("2 Can't send to subscriber, removing: ", e)
             if writer in QUEUES[queue]['subs']:
+                print("2 Can't send to subscriber, removing it from subs: ", e)
                 QUEUES[queue]['subs'].remove(writer)
-                writer.close()
+            print("2 Closing writer: ", e)
+            writer.close()
 
 
 @asyncio.coroutine
@@ -103,6 +108,7 @@ def handle_command(message, writer):
         msg = 'OK'
 
     elif command == COMMANDS.subscribe:
+        print(command)
         if queue not in QUEUES:
             return {
                 'type': MESSAGE_TYPES.error,
@@ -110,7 +116,8 @@ def handle_command(message, writer):
             }
         if read_all and persistent:
             yield from send_all(writer, queue)
-        QUEUES[queue]['subs'].append(writer)
+        if not read_all:
+            QUEUES[queue]['subs'].append(writer)
         msg = 'OK'
 
     return {

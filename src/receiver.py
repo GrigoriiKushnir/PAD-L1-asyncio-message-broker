@@ -21,9 +21,9 @@ def get_message(loop, queue, read_all):
 
 
 def main():
-    queue = input("Choose a queue: ")
+    # queue = input("Choose a queue: ")
     # read_all = input("Read persistent messages? 1/0: ")
-    # queue = "q1_p"
+    queue = "q1_p"
     read_all = 0
     loop = asyncio.get_event_loop()
     loop.run_until_complete(get_message(loop, queue, read_all))
