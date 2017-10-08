@@ -37,8 +37,9 @@ def run_sender(loop):
             print('Sending %s' % (message,))
             response = yield from send_message(message, loop, queue)
             print('Received %s' % (response.decode('utf-8'),))
-            yield from asyncio.sleep(0.5)
-        except KeyboardInterrupt:
+            yield from asyncio.sleep(0.3)
+        except Exception as e:
+            print("ERROR:", e)
             break
 
 

@@ -21,12 +21,12 @@ def send_error(writer, reason):
 
 @asyncio.coroutine
 def handle_message(reader, writer):
-    data = yield from reader.read()
+    data = yield from reader.read(1024)
     # address = writer.get_extra_info('peername')
     # LOGGER.debug('Recevied message from %s', address)
     try:
         message = json.loads(data.decode('utf-8'))
-        response = yield from dispatch_message(message, writer)
+        response = yield from dispatch_message(message, writer, reader)
         payload = json.dumps(response).encode('utf-8')
         writer.write(payload)
     except Exception as e:
@@ -48,7 +48,8 @@ def run_server(hostname='localhost', port=14141, loop=None):
     LOGGER.info('Press Ctrl + C to stop the application')
     try:
         loop.run_forever()
-    except KeyboardInterrupt:
+    except Exception as e:
+        print("serv", e)
         pass
     server.close()
     loop.run_until_complete(server.wait_closed())
