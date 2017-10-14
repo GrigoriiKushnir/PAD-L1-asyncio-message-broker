@@ -13,8 +13,8 @@ MESSAGE_TYPES = collections.namedtuple(
     'MessageTypes', ('command', 'error', 'response')
 )(*('command', 'error', 'response'))
 COMMANDS = collections.namedtuple(
-    'Commands', ('send', 'subscribe', 'received')
-)(*('send', 'subscribe', 'received'))
+    'Commands', ('send', 'subscribe', 'received', 'disconnect')
+)(*('send', 'subscribe', 'received', 'disconnect'))
 
 
 def read_messages(files):
@@ -65,48 +65,62 @@ def match_queues(queue):
 
 
 @asyncio.coroutine
-def send_all(writer, reader, queue):
+def send_all(writer, reader, queue, sub_id):
+    first = 0
     while not QUEUES[queue]["obj"].empty():
         try:
             message = yield from QUEUES[queue]["obj"].get()
-            writer.write(json.dumps(message).encode('utf-8'))
             reader.feed_data("feed".encode('utf-8'))
+            writer.write(json.dumps(message).encode('utf-8'))
             data = yield from reader.read(1024)
-            if data:
+            print(data)
+            if data.decode('utf-8') == "feed" and first == 1:
+                # this is a graceful disconnect
+                writer.close()
+                return
+            first = 1
+            if data.decode('utf-8') != "feed":
                 yield from delete_message(queue, message)
-                print(data)
+                # print("send_all", data)
             yield from writer.drain()
-            yield from asyncio.sleep(0.5)
+            yield from asyncio.sleep(0.1)
         except Exception as e:
+            yield from QUEUES[queue]["obj"].put(message)
             print("send_all error ", e)
+            # TODO: LWT
+            print("LWT!")
             writer.close()
             return
-    QUEUES[queue]['subs'].append((writer, reader))
+    QUEUES[queue]['subs'].append((writer, reader, sub_id))
     return "Subscribed to {}".format(queue)
 
 
 @asyncio.coroutine
-def send_to_subscribers(queue):
+def my_reader(reader):
+    reader.feed_data("feed".encode('utf-8'))
+    data = (yield from reader.read(1024)).decode('utf-8')
+    while data.startswith('feed') or data == '':
+        data = (yield from reader.read(1024)).decode('utf-8')
+    return data
+
+
+@asyncio.coroutine
+def send_to_subscribers(queue, message):
     if QUEUES[queue]['subs']:
-        message = yield from QUEUES[queue]['obj'].get()
         for streams in QUEUES[queue]['subs']:
+            writer = streams[0]
+            sub_id = streams[2]
             try:
-                writer = streams[0]
-                reader = streams[1]
-                # print(reader)
-                reader.feed_data("feed".encode('utf-8'))
                 writer.write(json.dumps(message).encode('utf-8'))
-                data = (yield from reader.read(1024)).decode('utf8')
                 yield from writer.drain()
-                if not data or data == "feed":
-                    print("No response, closing writer.")
-                    writer.close()
-                    QUEUES[queue]['subs'].remove(streams)
-                    return
             except Exception as e:
-                print("send_to_subscribers error: ", e)
-                QUEUES[queue]['subs'].remove(streams)
-                return "ERROR"
+                if streams in QUEUES[queue]['subs']:
+                    QUEUES[queue]['subs'].remove(streams)
+                    writer.close()
+                    print("send_to_subscribers error: ", e)
+                    # TODO: LWT
+                    print("LWT!", sub_id)
+                    return
             if queue.endswith("_p"):
                 yield from delete_message(queue, message)
     return "OK"
@@ -123,14 +137,15 @@ def handle_command(message, writer, reader):
 
     if command == COMMANDS.send:
         persistent = queue.endswith("_p")
-        yield from QUEUES[queue]['obj'].put(message)
         if persistent:
             yield from save_message(queue, message)
-        msg = yield from send_to_subscribers(queue)
+        msg = yield from send_to_subscribers(queue, message)
 
     elif command == COMMANDS.subscribe:
         queues_to_subscribe = match_queues(queue)
-        print(queues_to_subscribe)
+        sub_id = message.get('sub_id')
+        print("Subscribed", sub_id)
+        # print(queues_to_subscribe)
         if not queues_to_subscribe:
             return {
                 'type': MESSAGE_TYPES.error,
@@ -138,10 +153,19 @@ def handle_command(message, writer, reader):
             }
         for q in queues_to_subscribe:
             if q.endswith("_p"):
-                msg = yield from send_all(writer, reader, q)
+                msg = yield from send_all(writer, reader, q, sub_id)
             else:
-                QUEUES[q]['subs'].append((writer, reader))
+                QUEUES[q]['subs'].append((writer, reader, sub_id))
                 msg = "Subscribed to {}".format(q)
+    elif command == COMMANDS.disconnect:
+        sub_id = message.get('sub_id')
+        print("Disconnected", message.get('sub_id'))
+        for q in QUEUES:
+            for sub in QUEUES[q]['subs']:
+                if sub[2] == sub_id:
+                    QUEUES[q]['subs'].remove(sub)
+
+        msg = "Disconnect OK"
     return {
         'type': MESSAGE_TYPES.response,
         'payload': msg

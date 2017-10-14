@@ -27,7 +27,7 @@ def send_message(message, loop, queue):
 @asyncio.coroutine
 def run_sender(loop):
     print("Queues ending with _p will be persistent.")
-    queue = 'q1_p'
+    queue = 'q1'
     # queue = input("Choose a queue: ")
     # while queue == '':
     #     queue = input("Choose a queue: ")
@@ -36,8 +36,8 @@ def run_sender(loop):
             message = 'HI THERE %s' % (uuid.uuid4().hex,)
             print('Sending %s' % (message,))
             response = yield from send_message(message, loop, queue)
-            print('Received %s' % (response.decode('utf-8'),))
-            yield from asyncio.sleep(0.3)
+            # print('Received %s' % (response.decode('utf-8'),))
+            yield from asyncio.sleep(0.5)
         except Exception as e:
             print("ERROR:", e)
             break
