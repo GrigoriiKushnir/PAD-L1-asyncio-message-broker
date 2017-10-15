@@ -2,8 +2,9 @@ import asyncio
 import json
 import logging
 import os
+import time
 
-from .handlers import dispatch_message, read_messages
+from .handlers import dispatch_message, read_messages, send_to_subscribers, QUEUES, ALIVE, LWT
 
 LOGGER = logging.getLogger(__name__)
 
@@ -17,6 +18,29 @@ def send_error(writer, reason):
     payload = json.dumps(message).encode('utf-8')
     writer.write(payload)
     yield from writer.drain()
+
+
+@asyncio.coroutine
+def check_alive():
+    while True:
+        yield from asyncio.sleep(5)
+        for q in QUEUES:
+            for sub in QUEUES[q]['subs']:
+                sub_id = sub[2]
+                if time.time() - ALIVE[sub_id] > 5:
+                    print("diff: ", time.time() - ALIVE[sub_id])
+                    print("sub_id", sub_id)
+                    del ALIVE[sub_id]
+                    QUEUES[q]['subs'].remove(sub)
+                    lwt_message = {
+                        'type': 'command',
+                        'command': 'lwt',
+                        'payload': LWT[sub_id][1]
+                    }
+                    lwt_queue = LWT[sub_id][0]
+                    del LWT[sub_id]
+                    yield from send_to_subscribers(lwt_queue, lwt_message)
+                    print("Lwt sent: ", sub_id)
 
 
 @asyncio.coroutine
@@ -42,6 +66,7 @@ def run_server(hostname='localhost', port=14141, loop=None):
     read_messages(files)
     if loop is None:
         loop = asyncio.get_event_loop()
+    task = asyncio.Task(check_alive())
     coro = asyncio.start_server(handle_message, hostname, port, loop=loop)
     server = loop.run_until_complete(coro)
     LOGGER.info('Serving on %s', server.sockets[0].getsockname())
@@ -52,5 +77,7 @@ def run_server(hostname='localhost', port=14141, loop=None):
         print("serv", e)
         pass
     server.close()
+
     loop.run_until_complete(server.wait_closed())
+    loop.run_until_complete(task)
     loop.close()

@@ -5,10 +5,13 @@ import json
 from collections import defaultdict
 import aiofiles
 import re
+import time
 
 LOGGER = logging.getLogger(__name__)
 QUEUES = defaultdict(lambda: {'obj': asyncio.Queue(loop=asyncio.get_event_loop()), 'subs': []})
+QUEUES['q1']
 LWT = {}
+ALIVE = {}
 
 MESSAGE_TYPES = collections.namedtuple(
     'MessageTypes', ('command', 'error', 'response')
@@ -87,10 +90,14 @@ def send_all(writer, reader, queue, sub_id):
         except Exception as e:
             yield from QUEUES[queue]["obj"].put(message)
             # print("send_all error ", e)
-            lwt_message = LWT[sub_id][1]
+            lwt_message = {
+                'type': 'command',
+                'command': 'lwt',
+                'payload': LWT[sub_id][1]
+            }
             lwt_queue = LWT[sub_id][0]
             yield from send_to_subscribers(lwt_queue, lwt_message)
-            print("Lwt sent: ", sub_id)
+            print("Lwt sent send_all: ", sub_id)
             writer.close()
             return
     QUEUES[queue]['subs'].append((writer, reader, sub_id))
@@ -111,10 +118,15 @@ def send_to_subscribers(queue, message):
                     QUEUES[queue]['subs'].remove(streams)
                     writer.close()
                     # print("send_to_subscribers error: ", e)
-                    lwt_message = LWT[sub_id][1]
+                    lwt_message = {
+                        'type': 'command',
+                        'command': 'lwt',
+                        'payload': LWT[sub_id][1]
+                    }
                     lwt_queue = LWT[sub_id][0]
                     yield from send_to_subscribers(lwt_queue, lwt_message)
-                    print("Lwt sent: ", sub_id)
+                    print("Lwt send_to_subs: ", sub_id)
+                    print(e)
                     return
             if queue.endswith("_p"):
                 yield from delete_message(queue, message)
@@ -142,7 +154,6 @@ def handle_command(message, writer, reader):
         lwt_queue = message.get('lwt_queue')
         lwt_message = message.get('lwt_message')
         LWT[sub_id] = [lwt_queue, lwt_message]
-        print("Subscribed", sub_id)
         if not queues_to_subscribe:
             return {
                 'type': MESSAGE_TYPES.error,
@@ -167,6 +178,7 @@ def handle_command(message, writer, reader):
     elif command == COMMANDS.keep_alive:
         sub_id = message.get('sub_id')
         print("Keep alive from: ", sub_id)
+        ALIVE[sub_id] = time.time()
         msg = "Alive OK"
 
     return {

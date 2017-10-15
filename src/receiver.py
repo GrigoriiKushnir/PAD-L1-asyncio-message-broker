@@ -14,8 +14,9 @@ def keep_alive(loop, sub_id):
             'command': 'keep_alive',
             'sub_id': sub_id,
         }).encode('utf-8'))
+        response = (yield from reader.read(1024)).decode('utf8')
         yield from asyncio.sleep(3)
-        print("keep_alive sent")
+        print(response)
 
 
 @asyncio.coroutine
@@ -42,15 +43,17 @@ def get_message(loop, queue, lwt_queue, sub_id):
                 'type': 'command',
                 'command': 'received',
             }).encode('utf-8'))
-            # if counter == 3:
-            #     reader, writer = yield from asyncio.open_connection(
-            #         '127.0.0.1', 14141, loop=loop
-            #     )
-            #     writer.write(json.dumps({
-            #         'type': 'command',
-            #         'command': 'disconnect',
-            #         'sub_id': sub_id
-            #     }).encode('utf-8'))
+            if json.loads(response)['type'] == "error":
+                loop.close()
+                # if counter == 3:
+                #     reader, writer = yield from asyncio.open_connection(
+                #         '127.0.0.1', 14141, loop=loop
+                #     )
+                #     writer.write(json.dumps({
+                #         'type': 'command',
+                #         'command': 'disconnect',
+                #         'sub_id': sub_id
+                #     }).encode('utf-8'))
 
 
 def main():
