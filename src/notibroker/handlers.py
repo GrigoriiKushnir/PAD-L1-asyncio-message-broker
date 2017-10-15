@@ -8,13 +8,13 @@ import re
 
 LOGGER = logging.getLogger(__name__)
 QUEUES = defaultdict(lambda: {'obj': asyncio.Queue(loop=asyncio.get_event_loop()), 'subs': []})
+LWT = {}
 
 MESSAGE_TYPES = collections.namedtuple(
     'MessageTypes', ('command', 'error', 'response')
 )(*('command', 'error', 'response'))
-COMMANDS = collections.namedtuple(
-    'Commands', ('send', 'subscribe', 'received', 'disconnect')
-)(*('send', 'subscribe', 'received', 'disconnect'))
+COMMANDS = collections.namedtuple('Commands', ('send', 'subscribe', 'received', 'disconnect', 'keep_alive')
+)(*('send', 'subscribe', 'received', 'disconnect', 'keep_alive'))
 
 
 def read_messages(files):
@@ -86,22 +86,15 @@ def send_all(writer, reader, queue, sub_id):
             yield from asyncio.sleep(0.1)
         except Exception as e:
             yield from QUEUES[queue]["obj"].put(message)
-            print("send_all error ", e)
-            # TODO: LWT
-            print("LWT!")
+            # print("send_all error ", e)
+            lwt_message = LWT[sub_id][1]
+            lwt_queue = LWT[sub_id][0]
+            yield from send_to_subscribers(lwt_queue, lwt_message)
+            print("Lwt sent: ", sub_id)
             writer.close()
             return
     QUEUES[queue]['subs'].append((writer, reader, sub_id))
     return "Subscribed to {}".format(queue)
-
-
-@asyncio.coroutine
-def my_reader(reader):
-    reader.feed_data("feed".encode('utf-8'))
-    data = (yield from reader.read(1024)).decode('utf-8')
-    while data.startswith('feed') or data == '':
-        data = (yield from reader.read(1024)).decode('utf-8')
-    return data
 
 
 @asyncio.coroutine
@@ -117,9 +110,11 @@ def send_to_subscribers(queue, message):
                 if streams in QUEUES[queue]['subs']:
                     QUEUES[queue]['subs'].remove(streams)
                     writer.close()
-                    print("send_to_subscribers error: ", e)
-                    # TODO: LWT
-                    print("LWT!", sub_id)
+                    # print("send_to_subscribers error: ", e)
+                    lwt_message = LWT[sub_id][1]
+                    lwt_queue = LWT[sub_id][0]
+                    yield from send_to_subscribers(lwt_queue, lwt_message)
+                    print("Lwt sent: ", sub_id)
                     return
             if queue.endswith("_p"):
                 yield from delete_message(queue, message)
@@ -144,8 +139,10 @@ def handle_command(message, writer, reader):
     elif command == COMMANDS.subscribe:
         queues_to_subscribe = match_queues(queue)
         sub_id = message.get('sub_id')
+        lwt_queue = message.get('lwt_queue')
+        lwt_message = message.get('lwt_message')
+        LWT[sub_id] = [lwt_queue, lwt_message]
         print("Subscribed", sub_id)
-        # print(queues_to_subscribe)
         if not queues_to_subscribe:
             return {
                 'type': MESSAGE_TYPES.error,
@@ -157,6 +154,7 @@ def handle_command(message, writer, reader):
             else:
                 QUEUES[q]['subs'].append((writer, reader, sub_id))
                 msg = "Subscribed to {}".format(q)
+
     elif command == COMMANDS.disconnect:
         sub_id = message.get('sub_id')
         print("Disconnected", message.get('sub_id'))
@@ -164,8 +162,13 @@ def handle_command(message, writer, reader):
             for sub in QUEUES[q]['subs']:
                 if sub[2] == sub_id:
                     QUEUES[q]['subs'].remove(sub)
-
         msg = "Disconnect OK"
+
+    elif command == COMMANDS.keep_alive:
+        sub_id = message.get('sub_id')
+        print("Keep alive from: ", sub_id)
+        msg = "Alive OK"
+
     return {
         'type': MESSAGE_TYPES.response,
         'payload': msg
