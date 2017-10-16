@@ -40,11 +40,12 @@ def get_message(loop, queue, lwt_queue, sub_id):
             print(response)
             counter += 1
             writer.write(json.dumps({
-                'type': 'command',
-                'command': 'received',
+                'type': 'received',
+                'payload': 'Message received',
             }).encode('utf-8'))
             if json.loads(response)['type'] == "error":
                 loop.close()
+                # graceful disconnect simulation
                 # if counter == 3:
                 #     reader, writer = yield from asyncio.open_connection(
                 #         '127.0.0.1', 14141, loop=loop

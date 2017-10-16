@@ -4,7 +4,7 @@ import logging
 import os
 import time
 
-from .handlers import dispatch_message, read_messages, send_to_subscribers, QUEUES, ALIVE, LWT
+from .handlers import dispatch_message, read_messages, send_to_subscribers, QUEUES, ALIVE, LWT, MESSAGE_TYPES
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,26 +27,38 @@ def check_alive():
         for q in QUEUES:
             for sub in QUEUES[q]['subs']:
                 sub_id = sub[2]
-                if time.time() - ALIVE[sub_id] > 5:
-                    print("diff: ", time.time() - ALIVE[sub_id])
-                    print("sub_id", sub_id)
+                sub_writer = sub[0]
+                lwt_message = {
+                    'type': MESSAGE_TYPES.lwt,
+                    'payload': LWT[sub_id][1]
+                }
+                lwt_queue = LWT[sub_id][0]
+                try:
+                    sub_writer.write(json.dumps({
+                        'type': MESSAGE_TYPES.check_alive,
+                        'payload': "Broker alive check"
+                    }).encode('utf-8'))
+                    yield from sub_writer.drain()
+                except ConnectionError:
                     del ALIVE[sub_id]
                     QUEUES[q]['subs'].remove(sub)
-                    lwt_message = {
-                        'type': 'command',
-                        'command': 'lwt',
-                        'payload': LWT[sub_id][1]
-                    }
-                    lwt_queue = LWT[sub_id][0]
                     del LWT[sub_id]
                     yield from send_to_subscribers(lwt_queue, lwt_message)
-                    print("Lwt sent: ", sub_id)
+                    LOGGER.debug("Lwt sent - transport: %s", sub_id)
+                if sub_id in ALIVE:
+                    if time.time() - ALIVE[sub_id] > 5:
+                        # print("diff: ", time.time() - ALIVE[sub_id])
+                        # print("sub_id", sub_id)
+                        del ALIVE[sub_id]
+                        QUEUES[q]['subs'].remove(sub)
+                        del LWT[sub_id]
+                        yield from send_to_subscribers(lwt_queue, lwt_message)
+                        LOGGER.debug("Lwt sent - app: %s", sub_id)
 
 
 @asyncio.coroutine
 def handle_message(reader, writer):
     data = yield from reader.read(1024)
-    # address = writer.get_extra_info('peername')
     # LOGGER.debug('Recevied message from %s', address)
     try:
         message = json.loads(data.decode('utf-8'))

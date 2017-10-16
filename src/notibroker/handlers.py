@@ -14,10 +14,10 @@ LWT = {}
 ALIVE = {}
 
 MESSAGE_TYPES = collections.namedtuple(
-    'MessageTypes', ('command', 'error', 'response')
-)(*('command', 'error', 'response'))
-COMMANDS = collections.namedtuple('Commands', ('send', 'subscribe', 'received', 'disconnect', 'keep_alive')
-)(*('send', 'subscribe', 'received', 'disconnect', 'keep_alive'))
+    'MessageTypes', ('command', 'error', 'response', 'lwt', 'check_alive', 'received')
+)(*('command', 'error', 'response', 'lwt', 'check_alive', 'received'))
+COMMANDS = collections.namedtuple('Commands', ('send', 'subscribe', 'disconnect', 'keep_alive')
+)(*('send', 'subscribe', 'disconnect', 'keep_alive'))
 
 
 def read_messages(files):
@@ -62,7 +62,8 @@ def match_queues(queue):
     for i in QUEUES:
         try:
             queues_list.append(re.match(rex, i).group(0))
-        except Exception:
+        except Exception as e:
+            print("match_queues error:", e)
             pass
     return queues_list
 
@@ -76,7 +77,7 @@ def send_all(writer, reader, queue, sub_id):
             reader.feed_data("feed".encode('utf-8'))
             writer.write(json.dumps(message).encode('utf-8'))
             data = yield from reader.read(1024)
-            print(data)
+            # print(data)
             if data.decode('utf-8') == "feed" and first == 1:
                 # this is a graceful disconnect
                 writer.close()
@@ -84,20 +85,18 @@ def send_all(writer, reader, queue, sub_id):
             first = 1
             if data.decode('utf-8') != "feed":
                 yield from delete_message(queue, message)
-                # print("send_all", data)
             yield from writer.drain()
             yield from asyncio.sleep(0.1)
         except Exception as e:
             yield from QUEUES[queue]["obj"].put(message)
-            # print("send_all error ", e)
+            print("send_all error ", e)
             lwt_message = {
-                'type': 'command',
-                'command': 'lwt',
+                'type': MESSAGE_TYPES.lwt,
                 'payload': LWT[sub_id][1]
             }
             lwt_queue = LWT[sub_id][0]
             yield from send_to_subscribers(lwt_queue, lwt_message)
-            print("Lwt sent send_all: ", sub_id)
+            LOGGER.debug("Lwt sent - send_all: %s", sub_id)
             writer.close()
             return
     QUEUES[queue]['subs'].append((writer, reader, sub_id))
@@ -117,15 +116,13 @@ def send_to_subscribers(queue, message):
                 if streams in QUEUES[queue]['subs']:
                     QUEUES[queue]['subs'].remove(streams)
                     writer.close()
-                    # print("send_to_subscribers error: ", e)
                     lwt_message = {
-                        'type': 'command',
-                        'command': 'lwt',
+                        'type': MESSAGE_TYPES.lwt,
                         'payload': LWT[sub_id][1]
                     }
                     lwt_queue = LWT[sub_id][0]
                     yield from send_to_subscribers(lwt_queue, lwt_message)
-                    print("Lwt send_to_subs: ", sub_id)
+                    LOGGER.debug("Lwt send_to_subs: %s", sub_id)
                     print(e)
                     return
             if queue.endswith("_p"):
@@ -168,7 +165,7 @@ def handle_command(message, writer, reader):
 
     elif command == COMMANDS.disconnect:
         sub_id = message.get('sub_id')
-        print("Disconnected", message.get('sub_id'))
+        LOGGER.debug("Disconnected: %s", sub_id)
         for q in QUEUES:
             for sub in QUEUES[q]['subs']:
                 if sub[2] == sub_id:
@@ -177,7 +174,7 @@ def handle_command(message, writer, reader):
 
     elif command == COMMANDS.keep_alive:
         sub_id = message.get('sub_id')
-        print("Keep alive from: ", sub_id)
+        LOGGER.debug("Keep Alive from: %s", sub_id)
         ALIVE[sub_id] = time.time()
         msg = "Alive OK"
 

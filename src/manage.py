@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import logging.config
 from notibroker.broker import run_server
 
