@@ -63,7 +63,7 @@ def match_queues(queue):
         try:
             queues_list.append(re.match(rex, i).group(0))
         except Exception as e:
-            print("match_queues error:", e)
+            LOGGER.error("match_queues error {}".format(e))
             pass
     return queues_list
 
@@ -89,7 +89,7 @@ def send_all(writer, reader, queue, sub_id):
             yield from asyncio.sleep(0.1)
         except Exception as e:
             yield from QUEUES[queue]["obj"].put(message)
-            print("send_all error ", e)
+            LOGGER.error("send_all error {}".format(e))
             lwt_message = {
                 'type': MESSAGE_TYPES.lwt,
                 'payload': LWT[sub_id][1]
@@ -170,6 +170,8 @@ def handle_command(message, writer, reader):
             for sub in QUEUES[q]['subs']:
                 if sub[2] == sub_id:
                     QUEUES[q]['subs'].remove(sub)
+                    del ALIVE[sub_id]
+                    del LWT[sub_id]
         msg = "Disconnect OK"
 
     elif command == COMMANDS.keep_alive:
