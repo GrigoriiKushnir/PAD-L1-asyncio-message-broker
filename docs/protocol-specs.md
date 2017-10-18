@@ -9,14 +9,15 @@ The protocol for the system `notibroker` is based on JSON.
 - `keep_alive` - inform broker about alive connection;
 
 Example of the structure for a `notibroker` message (dicts dumped to json):
-
+```json
 {
     "type": "command",
     "command": "send",
     "queue": "<queue>",
     "payload": "<message>"
 }
-
+```
+```json
 {
     "type": "command",
     "command": "subscribe",
@@ -25,22 +26,25 @@ Example of the structure for a `notibroker` message (dicts dumped to json):
     "lwt_queue": "<lwt_queue>",
     "lwt_message": "<lwt_message>"
 }
-
+```
+```json
 {
     "type": "lwt",
     "payload": "<lwt_message>"
 }
-
+```
+```json
 {
     "type": "response",
     "payload": "<payload>"
 }
-
+```
+```json
 {
     "type": "error",
     "payload": "<payload>"
 }
-
+```
 
 `type` is type of the message. It must be one of the following:
 - `command`

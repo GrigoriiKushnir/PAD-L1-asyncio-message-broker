@@ -28,9 +28,9 @@ Persistent queues are read in memory from files on broker start.
 Non-persistent queues are considered as a "topic" and messages are routed directly to subscribers without storing.
 
 Client-subscriber (`src/sender.py`) polls each second for a new message **from** the broker.
-Subscriber can subscribe to queues using regex. It is used "*" to match any character in desired queue name.
-For example, for a given queues name standard say name.surname.nickname.alias you can use *.*.*.alias to subscribe to all
-alias queues. Or name.*.*.alias and so on. These can be shortened to *alias or name*alias.
+Subscriber can subscribe to queues using regex. It is used "\*" to match any character in desired queue name.
+For example, for a given queues name standard say name.surname.nickname.alias you can use \*.\*.\*.alias to subscribe to all
+alias queues. Or name.\*.\*.alias and so on. These can be shortened to \*alias or name\*alias.
 Subscriber can provide a Last Will and Testament message and queue. Broker will detect abnormal disconnect of subscriber
 and send the Last Will and Testament message to the given queue.
 Subscriber sends every couple of seconds a keep_alive message to the broker.
